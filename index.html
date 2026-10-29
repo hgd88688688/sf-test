@@ -2,10 +2,159 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>快递查询测试</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>顺丰快递单号查询</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;
+ padding:40px 16px;
+ background:#f3f4f6;
+ font-family:Arial,"Microsoft YaHei",sans-serif;
+}
+.card{
+ max-width:500px;
+ margin:auto;
+ padding:30px;
+ background:white;
+ border-radius:20px;
+ box-shadow:0 5px 25px #0001;
+}
+h1{
+ text-align:center;
+ font-size:27px;
+ margin:20px 0 30px;
+}
+.desc{
+ text-align:center;
+ color:#888;
+ margin-bottom:35px;
+}
+input{
+ width:100%;
+ padding:18px;
+ margin-bottom:16px;
+ border:1px solid #ddd;
+ border-radius:10px;
+ font-size:18px;
+}
+button{
+ width:100%;
+ padding:18px;
+ background:#3575f5;
+ color:white;
+ border:0;
+ border-radius:10px;
+ font-size:20px;
+}
+button:disabled{opacity:.6}
+#result{margin-top:25px}
+.item{
+ padding:16px;
+ background:#f5f7fb;
+ border-radius:10px;
+ margin-top:12px;
+ line-height:2;
+ overflow-wrap:anywhere;
+}
+.success{
+ background:#e7f8eb;
+ color:green;
+ padding:15px;
+ border-radius:8px;
+}
+.tip{
+ text-align:center;
+ color:#888;
+ margin-top:25px;
+}
+</style>
 </head>
+
 <body>
-<h1>快递查询入口测试成功</h1>
-<p>GitHub Pages 免费HTTPS测试正常</p>
+<div class="card">
+<h1>顺丰快递单号查询</h1>
+<p class="desc">请输入收件人姓名和手机后四位</p>
+
+<form id="form">
+<input id="name" placeholder="收件人姓名" required maxlength="30">
+<input id="phone" placeholder="手机后四位"
+inputmode="numeric" maxlength="4" pattern="[0-9]{4}" required>
+<button id="btn" type="submit">立即查询</button>
+</form>
+
+<div id="result"></div>
+<p class="tip">查询结果仅供收件人核对</p>
+</div>
+
+<script>
+const API="https://sf-query-test.erge8868.workers.dev/api/query";
+
+const form=document.getElementById("form");
+const result=document.getElementById("result");
+const btn=document.getElementById("btn");
+
+function message(text,cls="tip"){
+ result.replaceChildren();
+ const div=document.createElement("div");
+ div.className=cls;
+ div.textContent=text;
+ result.appendChild(div);
+}
+
+form.addEventListener("submit",async(e)=>{
+ e.preventDefault();
+
+ const name=document.getElementById("name").value.trim();
+ const phone=document.getElementById("phone").value.trim();
+
+ if(!name||!/^[0-9]{4}$/.test(phone)){
+  message("请输入正确的姓名和手机后四位");
+  return;
+ }
+
+ btn.disabled=true;
+ btn.textContent="查询中...";
+
+ const controller=new AbortController();
+ const timer=setTimeout(()=>controller.abort(),15000);
+
+ try{
+  const response=await fetch(API,{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({name,phone}),
+   signal:controller.signal
+  });
+
+  const data=await response.json();
+
+  if(response.status===429){
+   message("查询过于频繁，请稍后再试");
+  }else if(!response.ok||!data.ok){
+   message("查询服务暂时不可用，请稍后再试");
+  }else if(!data.items||data.items.length===0){
+   message("没有查询到对应快递单号");
+  }else{
+   message("查询成功，共找到 "+data.items.length+" 条订单","success");
+
+   data.items.forEach(item=>{
+    const div=document.createElement("div");
+    div.className="item";
+    div.textContent="快递单号："+item.tracking_number+
+     "\n所属仓库："+item.warehouse_name;
+    div.style.whiteSpace="pre-line";
+    result.appendChild(div);
+   });
+  }
+ }catch(error){
+  message("连接查询服务失败，请检查网络");
+ }finally{
+  clearTimeout(timer);
+  btn.disabled=false;
+  btn.textContent="立即查询";
+ }
+});
+</script>
 </body>
 </html>
