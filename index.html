@@ -68,6 +68,20 @@ button:disabled{opacity:.6}
  color:#888;
  margin-top:25px;
 }
+.tracking-label{font-size:14px;color:#777}
+.tracking-no{
+ font-weight:bold;font-size:21px;line-height:1.6;
+ overflow-wrap:anywhere;user-select:text;-webkit-user-select:text;
+}
+.copy-tip,.open-tip{color:#888;font-size:13px;line-height:1.6;text-align:center}
+.tracking-meta{margin-top:12px;line-height:1.9}
+.copy-button{background:#1677ff;margin-top:12px;font-size:16px;padding:12px}
+.open-button{
+ display:block;background:#ff4d4f;color:#fff;
+ text-decoration:none;text-align:center;border-radius:9px;
+ margin-top:10px;padding:12px;font-size:16px;line-height:1.5;
+}
+.open-tip{margin-top:8px}
 </style>
 </head>
 
@@ -89,6 +103,8 @@ inputmode="numeric" maxlength="4" pattern="[0-9]{4}" required>
 
 <script>
 const API="https://sf-query-test.erge8868.workers.dev/api/query";
+// Restored from old app.py: SF International waybill lookup landing page.
+const SF_TRACKING_URL="https://www.sf-international.com/us/sc/support/querySupport/waybill";
 
 const form=document.getElementById("form");
 const result=document.getElementById("result");
@@ -100,6 +116,39 @@ function message(text,cls="tip"){
  div.className=cls;
  div.textContent=text;
  result.appendChild(div);
+}
+
+async function copyTracking(number,button){
+ let copied=false;
+ try{
+  if(navigator.clipboard && window.isSecureContext){
+   await navigator.clipboard.writeText(number);
+   copied=true;
+  }
+ }catch(error){ /* Browser denied direct clipboard access. */ }
+ if(!copied){
+  const area=document.createElement("textarea");
+  area.value=number;
+  area.setAttribute("readonly","");
+  area.style.position="fixed";
+  area.style.left="-9999px";
+  document.body.appendChild(area);
+  area.focus();
+  area.select();
+  area.setSelectionRange(0,area.value.length);
+  try{copied=document.execCommand("copy");}catch(error){copied=false;}
+  area.remove();
+ }
+ if(copied){
+  button.textContent="✅ 已复制";
+  button.style.background="#52c41a";
+  setTimeout(()=>{
+   button.textContent="① 复制单号";
+   button.style.background="";
+  },3000);
+ }else{
+  window.prompt("浏览器不允许自动复制，请长按复制这个运单号：",number);
+ }
 }
 
 form.addEventListener("submit",async(e)=>{
@@ -141,9 +190,37 @@ form.addEventListener("submit",async(e)=>{
    data.items.forEach(item=>{
     const div=document.createElement("div");
     div.className="item";
-    div.textContent="快递单号："+item.tracking_number+
-     "\n所属仓库："+item.warehouse_name;
-    div.style.whiteSpace="pre-line";
+    const label=document.createElement("div");
+    label.className="tracking-label";
+    label.textContent="顺丰运单号";
+    const number=document.createElement("div");
+    number.className="tracking-no";
+    number.textContent=String(item.tracking_number ?? "");
+    const tip=document.createElement("div");
+    tip.className="copy-tip";
+    tip.textContent="长按上方单号也可以复制";
+    const meta=document.createElement("div");
+    meta.className="tracking-meta";
+    const warehouse=document.createElement("div");
+    warehouse.textContent="仓库："+String(item.warehouse_name ?? "");
+    const orderTime=document.createElement("div");
+    orderTime.textContent="录单时间："+String(item.order_time || "暂无记录");
+    meta.append(warehouse,orderTime);
+    const copy=document.createElement("button");
+    copy.type="button";
+    copy.className="copy-button";
+    copy.textContent="① 复制单号";
+    copy.addEventListener("click",()=>copyTracking(number.textContent,copy));
+    const open=document.createElement("a");
+    open.className="open-button";
+    open.textContent="② 打开顺丰查询";
+    open.href=SF_TRACKING_URL;
+    open.target="_blank";
+    open.rel="noopener noreferrer";
+    const openTip=document.createElement("div");
+    openTip.className="open-tip";
+    openTip.textContent="打开后，在运单号输入框长按粘贴";
+    div.append(label,number,tip,meta,copy,open,openTip);
     result.appendChild(div);
    });
   }
